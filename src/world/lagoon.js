@@ -238,7 +238,9 @@ function makeBubbles(count, bounds, floorY) {
 export function createLagoon(scene, seed = 7) {
   const rng = makeRng(seed);
   const floorY = -4;
-  const bounds = { minX: -13, maxX: 13, minY: -3.0, maxY: -0.9, minZ: -7.5, maxZ: 6.5 };
+  // Fish swim in a band of depths; the visible area widens toward the back.
+  const bounds = { minX: -16, maxX: 16, minY: -2.4, maxY: -1.0, minZ: -10, maxZ: 4.2 };
+  const maxXAt = (z) => 9 + (5 - z) * 0.55;
 
   scene.background = WATER_COLOUR.clone();
   scene.fog = new THREE.Fog(WATER_COLOUR, 24, 50);
@@ -299,9 +301,23 @@ export function createLagoon(scene, seed = 7) {
   const bubbles = makeBubbles(70, bounds, floorY);
   scene.add(bubbles);
 
+  const dayWater = WATER_COLOUR.clone();
+  const duskWater = new THREE.Color('#2f8fb8');
+  const daySun = new THREE.Color('#fff4d8');
+  const duskSun = new THREE.Color('#ffa060');
   return {
     bounds,
+    maxXAt,
     floorY,
+    // 0 = midday, 1 = sunset. The round timer drives this.
+    setSunset(k) {
+      const water = dayWater.clone().lerp(duskWater, k);
+      scene.background.copy(water);
+      scene.fog.color.copy(water);
+      floor.material.uniforms.uWater.value.copy(water);
+      sun.color.copy(daySun).lerp(duskSun, k);
+      sun.intensity = 2.0 - k * 0.5;
+    },
     update(dt, time) {
       floor.material.uniforms.uTime.value = time;
       surface.material.uniforms.uTime.value = time;

@@ -31,10 +31,13 @@ export class Spawner {
     const recipe = SPECIES[species];
     const leaderSpec = makeFishSpec(species, this.rng.int(0, 2 ** 31), opts);
     const leader = this.add(new Fish(leaderSpec, this.world));
-    leader.placeRandomly();
+    if (opts.enter) leader.enterFromSide(opts.side);
+    else leader.placeRandomly();
+    if (opts.lifetime) leader.lifetime = opts.lifetime;
+    if (opts.speedBoost) leader.baseSpeed *= opts.speedBoost;
     const group = [leader];
     if (recipe.school && !opts.single) {
-      const n = this.rng.int(recipe.school[0], recipe.school[1]);
+      const n = opts.schoolSize ?? this.rng.int(recipe.school[0], recipe.school[1]);
       for (let i = 1; i < n; i++) {
         // School members share the leader's palette roll but vary in size/details.
         const spec = makeFishSpec(species, this.rng.int(0, 2 ** 31), { rarity: 'common' });
@@ -42,6 +45,7 @@ export class Spawner {
         const f = this.add(new Fish(spec, this.world, leader));
         f.object.position.copy(leader.object.position).add(f.schoolOffset);
         f.yaw = leader.yaw;
+        if (opts.lifetime) f.lifetime = opts.lifetime + 2;
         group.push(f);
       }
     }
@@ -72,6 +76,13 @@ export class Spawner {
 
   update(dt, time) {
     for (const f of this.fish) f.update(dt, time);
+    // Fish that swam away off-screen are gone for good.
+    for (const f of [...this.fish]) if (f.state === 'leaving' && f.isOffscreen) this.remove(f);
+  }
+
+  // Number of free-swimming groups (a school counts once).
+  groupCount() {
+    return this.fish.filter((f) => f.state === 'swim' && !f.leader && !f.spec.boss).length;
   }
 
   counts() {
